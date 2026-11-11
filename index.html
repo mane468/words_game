@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Completa la palabra</title>
+<style>
+  :root{
+    --bg1:#ffe9f3; --bg2:#e6f0ff; --ink:#3a2e5a; --tile:#fff; --accent:#7c5cff;
+    --ok:#22c55e; --bad:#ef4444; --gold:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  body{
+    margin:0; min-height:100vh; font-family:"Comic Sans MS","Trebuchet MS",system-ui,sans-serif;
+    color:var(--ink); background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    display:flex; flex-direction:column; align-items:center;
+  }
+  header{width:100%; max-width:900px; display:flex; justify-content:space-between; align-items:center; padding:14px 18px; gap:10px; flex-wrap:wrap}
+  .pill{background:#fff; border-radius:999px; padding:8px 16px; font-size:1.2rem; box-shadow:0 3px 10px #0001; border:0; font-family:inherit; color:var(--ink)}
+  button.pill{cursor:pointer}
+  .gear{border:0; background:#fff; border-radius:999px; padding:8px 14px; font-size:1rem; cursor:pointer; box-shadow:0 3px 10px #0001; opacity:.6; font-family:inherit; color:var(--ink)}
+  main{width:100%; max-width:900px; padding:0 16px 30px; display:flex; flex-direction:column; align-items:center; gap:16px}
+
+  /* menú */
+  #menu h1{font-size:clamp(2rem,8vw,3.4rem); margin:10px 0 0; text-align:center}
+  #menu p.sub{margin:0 0 10px; font-size:1.2rem; text-align:center}
+  .modes{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:18px; width:100%; max-width:900px}
+  .mode{
+    font:inherit; color:var(--ink); background:#fff; border:0; border-radius:24px; padding:26px 18px;
+    box-shadow:0 8px 0 #d4cdf7; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:8px;
+    transition:transform .1s;
+  }
+  .mode:hover{transform:translateY(-3px)}
+  .mode:active{transform:translateY(5px); box-shadow:0 2px 0 #d4cdf7}
+  .mode .ic{font-size:4rem; line-height:1}
+  .mode .t{font-size:1.5rem; font-weight:700}
+  .mode .d{font-size:1rem; opacity:.75; text-align:center}
+  .mode .r{font-size:.9rem; background:#ede9fe; border-radius:999px; padding:3px 12px}
+  #menuMsg{min-height:1.6rem; color:#b91c1c; text-align:center; font-size:1.1rem}
+  .view{width:100%; display:flex; flex-direction:column; align-items:center; gap:16px}
+
+  /* juego */
+  #emoji{font-size:clamp(4rem,14vw,7rem); line-height:1; transition:transform .3s}
+  #emoji.bounce{animation:bounce .6s}
+  #hear{font:inherit; border:0; background:#fff; border-radius:999px; padding:6px 14px; cursor:pointer; box-shadow:0 3px 10px #0001; margin-top:-6px; color:var(--ink)}
+  #hearts{font-size:1.8rem; letter-spacing:4px; min-height:2.2rem}
+  #word{display:flex; gap:clamp(4px,1.5vw,12px); flex-wrap:wrap; justify-content:center}
+  .tile{
+    width:clamp(40px,11vw,80px); height:clamp(54px,14vw,100px); background:var(--tile);
+    border-radius:14px; box-shadow:0 5px 0 #c9bff5; display:flex; align-items:center; justify-content:center;
+    font-size:clamp(1.9rem,8vw,3.8rem); font-weight:700;
+  }
+  .tile.hole{border:4px dashed var(--accent); box-shadow:none; background:#fff8; animation:pulse 1.2s infinite}
+  .tile.good{background:#dcfce7; box-shadow:0 5px 0 #86efac; animation:pop .5s}
+  .tile.done{background:#dcfce7; box-shadow:0 5px 0 #86efac}
+  .tile.bad{background:#fee2e2; box-shadow:0 5px 0 #fca5a5}
+  #msg{min-height:1.6rem; font-size:1.2rem; text-align:center}
+  #keys{display:grid; grid-template-columns:repeat(auto-fit,minmax(54px,1fr)); gap:10px; width:100%; max-width:760px}
+  .key{
+    font:inherit; font-size:1.7rem; font-weight:700; padding:12px 0; border:0; border-radius:14px;
+    background:#fff; color:var(--ink); box-shadow:0 5px 0 #d4cdf7; cursor:pointer; transition:transform .08s;
+  }
+  .key:active{transform:translateY(4px); box-shadow:0 1px 0 #d4cdf7}
+  .key.used{background:#fecaca; color:#b91c1c; box-shadow:none; opacity:.6; pointer-events:none; animation:shake .4s}
+  .key.wrong{background:#fecaca; color:#b91c1c; animation:shake .4s}
+  .key:disabled{pointer-events:none}
+
+  /* animación de acierto / error: aparece y sube */
+  .fx{
+    position:fixed; left:50%; top:55%; transform:translate(-50%,-50%); font-size:min(38vw,230px);
+    pointer-events:none; z-index:50; animation:riseUp 1.3s ease-out forwards;
+    filter:drop-shadow(0 8px 14px #0004);
+  }
+  @keyframes riseUp{
+    0%{opacity:0; transform:translate(-50%,-30%) scale(.2)}
+    25%{opacity:1; transform:translate(-50%,-50%) scale(1.15)}
+    45%{transform:translate(-50%,-55%) scale(1)}
+    100%{opacity:0; transform:translate(-50%,-190%) scale(1)}
+  }
+  @keyframes pop{0%{transform:scale(.6)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+  @keyframes pulse{50%{transform:scale(1.06)}}
+  @keyframes bounce{0%,100%{transform:translateY(0)}40%{transform:translateY(-22px)}}
+
+  /* diálogos */
+  dialog{border:0; border-radius:20px; padding:20px; width:min(560px,94vw); box-shadow:0 10px 40px #0005; font-family:inherit; color:var(--ink)}
+  dialog::backdrop{background:#0006}
+  dialog h2{margin-top:0}
+  .row{display:flex; gap:8px; margin:8px 0; flex-wrap:wrap}
+  input[type=text],input[type=number]{font:inherit; padding:8px 10px; border:2px solid #d4cdf7; border-radius:10px}
+  button.btn{font:inherit; padding:8px 14px; border:0; border-radius:10px; background:var(--accent); color:#fff; cursor:pointer}
+  button.btn.alt{background:#e5e7eb; color:var(--ink)}
+  button.btn.red{background:var(--bad)}
+  #list{max-height:240px; overflow:auto; border:2px solid #eee; border-radius:10px; padding:6px}
+  .item{display:flex; justify-content:space-between; align-items:center; padding:4px 6px; border-bottom:1px solid #f1f1f1}
+  small{opacity:.7}
+
+  #endDlg{text-align:center; width:min(440px,92vw)}
+  #msg.reveal{font-size:clamp(1.6rem,6vw,2.6rem); font-weight:700; color:#b91c1c}
+  #endWord{font-size:clamp(2.8rem,13vw,4.4rem); font-weight:700; letter-spacing:.12em; margin:4px 0 12px; word-break:break-all; line-height:1.1}
+  #endWord b{color:var(--ok); text-decoration:underline; text-decoration-thickness:5px; text-underline-offset:6px}
+  #endDlg .big{font-size:5rem; line-height:1}
+  #endDlg h2{font-size:1.8rem; margin:8px 0}
+  #endDlg p{font-size:1.2rem; margin:6px 0 16px}
+  #endDlg .acts{display:flex; flex-direction:column; gap:10px}
+  #endDlg .acts button{font:inherit; font-size:1.4rem; padding:14px; border:0; border-radius:16px; cursor:pointer; color:#fff; background:var(--accent); box-shadow:0 5px 0 #5b3fd6}
+  #endDlg .acts button.alt{background:#e5e7eb; color:var(--ink); box-shadow:0 5px 0 #c8cbd1}
+  #endDlg .acts button:active{transform:translateY(4px); box-shadow:none}
+</style>
+</head>
+<body>
+<header>
+  <button class="pill" id="back" hidden>🏠 Menú</button>
+  <div class="pill" id="prog" hidden>1 / 1</div>
+  <div class="pill">⭐ <span id="stars">0</span></div>
+  <button class="gear" id="openAdmin">⚙ Padres</button>
+</header>
+
+<main>
+  <!-- MENÚ -->
+  <section class="view" id="menu">
+    <h1>🎈 ¡A jugar!</h1>
+    <p class="sub">Elige un juego</p>
+    <div class="modes">
+      <button class="mode" id="mode1">
+        <span class="ic">🔤</span>
+        <span class="t">Letra que falta</span>
+        <span class="d">Mira el dibujo y elige la letra que falta</span>
+        <span class="r" id="rnd1"></span>
+      </button>
+      <button class="mode" id="mode2">
+        <span class="ic">✏️</span>
+        <span class="t">Escribir palabra</span>
+        <span class="d">Mira el dibujo y escribe la palabra completa</span>
+        <span class="r" id="rnd2"></span>
+      </button>
+    </div>
+    <div id="menuMsg"></div>
+  </section>
+
+  <!-- JUEGO -->
+  <section class="view" id="game" hidden>
+    <div id="emoji"></div>
+    <button id="hear" hidden>🔊 Escuchar</button>
+    <div id="hearts"></div>
+    <div id="word"></div>
+    <div id="msg"></div>
+    <div id="keys"></div>
+  </section>
+</main>
+
+<div id="soundWarn" hidden style="position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#fff3cd;color:#664d03;padding:12px 18px;border-radius:14px;box-shadow:0 6px 20px #0003;z-index:60;max-width:92vw;text-align:center"></div>
+
+<!-- fin de ronda -->
+<dialog id="endDlg">
+  <div class="big" id="endIcon"></div>
+  <h2 id="endTitle"></h2>
+  <div id="endWord" hidden></div>
+  <p id="endText"></p>
+  <div class="acts">
+    <button id="endMain"></button>
+    <button class="alt" id="endMenu">🏠 Volver al menú</button>
+  </div>
+</dialog>
+
+<dialog id="pinDlg" style="width:min(340px,92vw)">
+  <h2>PIN de padres</h2>
+  <div class="row">
+    <input type="text" id="pinInput" inputmode="numeric" maxlength="8" placeholder="PIN" autocomplete="off" style="flex:1">
+  </div>
+  <small id="pinErr" style="color:#b91c1c"></small>
+  <div class="row" style="justify-content:flex-end">
+    <button class="btn alt" id="pinCancel">Cancelar</button>
+    <button class="btn" id="pinOk">Entrar</button>
+  </div>
+</dialog>
+
+<dialog id="admin">
+  <h2>Panel de padres</h2>
+
+  <h3>Añadir palabra</h3>
+  <div class="row">
+    <input type="text" id="newWord" placeholder="palabra (ej: paloma)" maxlength="20">
+    <input type="text" id="newEmoji" placeholder="emoji 🕊️" maxlength="4" style="width:90px">
+    <button class="btn" id="addBtn">Añadir</button>
+  </div>
+  <small id="addErr"></small>
+
+  <h3>Palabras: <span id="count">0</span></h3>
+  <small>Marca las que quieres que salgan en el juego.</small>
+  <div class="row">
+    <button class="btn alt" id="selAll">Seleccionar todas</button>
+    <button class="btn alt" id="selNone">Quitar todas</button>
+  </div>
+  <div id="list"></div>
+
+  <h3>Ajustes</h3>
+  <div class="row">
+    <label>PIN de padres: <input type="text" id="pin" maxlength="8" style="width:100px"></label>
+  </div>
+  <div class="row">
+    <label><input type="checkbox" id="voice"> Leer en voz alta las letras y palabras</label>
+  </div>
+
+  <h3>Sonido</h3>
+  <div class="row">
+    <button class="btn alt" id="testSnd">🔊 Probar sonido</button>
+  </div>
+  <small id="sndStatus"></small>
+
+  <h3>Copia de palabras</h3>
+  <div class="row">
+    <button class="btn alt" id="exportBtn">Descargar palabras</button>
+    <button class="btn alt" id="importBtn">Cargar palabras</button>
+    <input type="file" id="importFile" accept=".json" hidden>
+    <button class="btn red" id="resetProg">Reiniciar progreso</button>
+  </div>
+  <div class="row" style="justify-content:flex-end">
+    <button class="btn" id="closeAdmin">Listo</button>
+  </div>
+</dialog>
+
+<script>
+const LS = {
+  get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d }catch{ return d } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)) }catch{} }
+};
+
+const DEFAULT_WORDS = [
+  {w:'paloma',e:'🕊️'},{w:'casa',e:'🏠'},{w:'gato',e:'🐱'},{w:'luna',e:'🌙'},
+  {w:'perro',e:'🐶'},{w:'flor',e:'🌸'},{w:'mariposa',e:'🦋'},{w:'pelota',e:'⚽'},
+  {w:'sol',e:'☀️'},{w:'mesa',e:'🪑'}
+];
+const ALPHABET = [...'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ'];
+
+let words    = LS.get('cw_words', DEFAULT_WORDS);
+let settings = Object.assign({pin:'1234', voice:true}, LS.get('cw_settings',{}));
+
+// progreso: estrellas compartidas y número de ronda (vuelta) por modo
+let prog = LS.get('cw_prog', {});
+prog.stars = prog.stars || 0;
+prog.m = prog.m || {};
+[1,2].forEach(m=>{ prog.m[m] = { lap: (prog.m[m] && prog.m[m].lap) || 0 }; });
+
+const $ = id => document.getElementById(id);
+const save = () => { LS.set('cw_words',words); LS.set('cw_settings',settings); LS.set('cw_prog',prog); };
+const active = () => words.filter(x => x.a !== false);
+
+// letra base (sin tilde, conservando la Ñ)
+function norm(c){
+  c = c.toUpperCase();
+  if(c==='Ñ') return 'Ñ';
+  return c.normalize('NFD')[0];
+}
+
+/* ---------- voz y sonidos ---------- */
+function speak(text){
+  if(!settings.voice) return;
+  speechText(text, .85);
+}
+let actx;
+function beep(kind){
+  try{
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    const notes = kind==='tick' ? [660] : kind ? [523,659,784] : [300,220];
+    notes.forEach((f,i)=>{
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = kind===false ? 'sawtooth' : 'triangle'; o.frequency.value = f;
+      g.gain.setValueAtTime(.15, actx.currentTime + i*.12);
+      g.gain.exponentialRampToValueAtTime(.001, actx.currentTime + i*.12 + .2);
+      o.connect(g); g.connect(actx.destination);
+      o.start(actx.currentTime + i*.12); o.stop(actx.currentTime + i*.12 + .22);
+    });
+  }catch{}
+}
+
+/* ---------- animación ✅ / ❌ que sube ---------- */
+function showFx(ok){
+  const el = document.createElement('div');
+  el.className = 'fx';
+  el.textContent = ok ? '✅' : '❌';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 1400);
+  beep(ok);
+}
+
+/* ---------- vistas ---------- */
+let timer = null;
+const later = (fn, ms) => { clearTimeout(timer); timer = setTimeout(fn, ms); };
+
+function showView(v){
+  $('menu').hidden = v !== 'menu';
+  $('game').hidden = v !== 'game';
+  $('back').hidden = v !== 'game';
+  $('prog').hidden = v !== 'game';
+  $('openAdmin').hidden = v !== 'menu';
+  $('stars').textContent = prog.stars;
+}
+function goMenu(){
+  clearTimeout(timer);
+  try{ speechSynthesis.cancel(); }catch{}
+  if($('endDlg').open) $('endDlg').close();
+  run = null; round = null;
+  renderMenu();
+  showView('menu');
+}
+function renderMenu(){
+  $('rnd1').textContent = 'Ronda ' + (prog.m[1].lap + 1);
+  $('rnd2').textContent = 'Ronda ' + (prog.m[2].lap + 1);
+  $('menuMsg').textContent = '';
+  $('stars').textContent = prog.stars;
+}
+
+/* ---------- juego ---------- */
+let run = null;    // la ronda: lista de palabras en su orden
+let round = null;  // la palabra actual
+
+const shuffle = a => { a = [...a]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+
+// orden aleatorio en cada ronda (siempre distinto al de la ronda anterior)
+let lastOrder = '';
+function rotated(lap){
+  const list = active(), idx = list.map((_,k)=>k);
+  let order, tries = 0;
+  do { order = shuffle(idx); tries++; }
+  while(list.length > 1 && order.join() === lastOrder && tries < 20);
+  lastOrder = order.join();
+  return order.map(k => ({ item:list[k], k }));
+}
+
+// letra faltante al azar (no repite la misma letra seguida para una misma palabra)
+const lastHidden = {};
+function randomHidden(word, len){
+  if(len < 2) return 0;
+  let h, tries = 0;
+  do { h = Math.floor(Math.random()*len); tries++; } while(h === lastHidden[word] && tries < 20);
+  lastHidden[word] = h;
+  return h;
+}
+
+function startRun(m){
+  const list = active();
+  if(!list.length){
+    $('menuMsg').textContent = 'Pide a un adulto que seleccione palabras (⚙ Padres)';
+    return;
+  }
+  const lap = prog.m[m].lap;
+  run = { mode:m, lap, list:rotated(lap), i:0 };
+  showView('game');
+  nextWord();
+}
+
+function renderHearts(){
+  $('hearts').textContent = '❤️'.repeat(round.lives) + '🤍'.repeat(round.max-round.lives);
+}
+
+function renderTiles(state){ // state: null | 'good' | 'bad'
+  const box = $('word'); box.innerHTML = '';
+  round.chars.forEach((ch,i)=>{
+    const t = document.createElement('div');
+    t.className = 'tile';
+    if(round.mode===1){
+      if(i===round.hidden){
+        if(state){ t.textContent = ch; t.classList.add(state); }
+        else t.classList.add('hole');
+      } else t.textContent = ch;
+    } else {
+      if(state==='good'){ t.textContent = ch; t.classList.add('good'); }
+      else if(state==='bad'){ t.textContent = ch; t.classList.add(i<round.pos ? 'done' : 'bad'); }
+      else if(i<round.pos){ t.textContent = ch; t.classList.add(i===round.pos-1 ? 'good' : 'done'); }
+      else if(i===round.pos) t.classList.add('hole');
+    }
+    box.appendChild(t);
+  });
+}
+
+function buildKeys(){
+  const k = $('keys'); k.innerHTML = '';
+  ALPHABET.forEach(L=>{
+    const b = document.createElement('button');
+    b.className = 'key'; b.textContent = L; b.dataset.l = L;
+    b.onclick = () => pick(L, b);
+    k.appendChild(b);
+  });
+}
+
+function nextWord(){
+  if(!run) return;
+  const { item, k } = run.list[run.i];
+  const chars = [...item.w.toUpperCase()];
+  const mode = run.mode;
+  if(mode===1){
+    // la letra faltante es al azar
+    const hidden = randomHidden(item.w, chars.length);
+    round = { mode, item, chars, hidden, answer:norm(chars[hidden]), lives:3, max:3, done:false };
+  } else {
+    round = { mode, item, chars, pos:0, lives:5, max:5, done:false };
+  }
+  $('emoji').textContent = item.e || '❓';
+  $('hear').hidden = mode !== 2;
+  $('prog').textContent = (run.i+1) + ' / ' + run.list.length;
+  $('msg').classList.remove('reveal');
+  $('msg').textContent = mode===1 ? '¿Qué letra falta?' : '¡Escribe la palabra!';
+  buildKeys(); renderHearts(); renderTiles(null);
+}
+
+function showEnd(win){
+  const total = run.list.length;
+  $('endWord').hidden = win;
+  $('endMenu').textContent = '🏠 Volver al menú';
+  $('endMenu').onclick = goMenu;
+  if(win){
+    $('endIcon').textContent = '🎉';
+    $('endTitle').textContent = '¡Terminaste la ronda!';
+    $('endText').textContent = 'Completaste ' + total + (total===1 ? ' palabra.' : ' palabras.');
+    $('endMain').textContent = '▶ Seguir';
+    $('endMain').onclick = ()=>{ $('endDlg').close(); startRun(run.mode); };
+  } else {
+    $('endIcon').textContent = round.item.e || '😢';
+    $('endTitle').textContent = '¡Se acabaron los corazones!';
+    $('endText').textContent = 'La palabra se escribe así:';
+    // palabra en grande; en "Letra que falta" se resalta la letra que faltaba
+    const ew = $('endWord'); ew.textContent = '';
+    round.chars.forEach((ch,i)=>{
+      if(round.mode===1 && i===round.hidden){
+        const b = document.createElement('b'); b.textContent = ch; ew.appendChild(b);
+      } else ew.appendChild(document.createTextNode(ch));
+    });
+    $('endMain').textContent = '🔄 Reintentar';
+    $('endMain').onclick = ()=>{ $('endDlg').close(); startRun(run.mode); };
+  }
+  $('endDlg').showModal();
+}
+$('endMenu').onclick = goMenu;
+$('endDlg').addEventListener('cancel', e => e.preventDefault());
+
+function endWord(ok){
+  round.done = true;
+  document.querySelectorAll('.key').forEach(b=>b.disabled=true);
+  if(ok){
+    prog.stars++;
+    $('stars').textContent = prog.stars;
+    run.i++;
+    if(run.i >= run.list.length){
+      prog.m[run.mode].lap++;   // la próxima ronda cambia el orden
+      save();
+      later(()=>showEnd(true), 1800);
+    } else {
+      save();
+      later(nextWord, 1800);
+    }
+  } else {
+    $('msg').classList.add('reveal');
+    later(()=>showEnd(false), 2600);
+  }
+}
+
+function bounceEmoji(){
+  $('emoji').classList.remove('bounce'); void $('emoji').offsetWidth; $('emoji').classList.add('bounce');
+}
+
+function pick(L, btn){
+  if(!round || round.done) return;
+  speak(L);
+
+  if(round.mode===1){
+    if(L === round.answer){
+      showFx(true);
+      btn.disabled = true;
+      renderTiles('good'); bounceEmoji();
+      $('msg').textContent = '¡Muy bien! ' + round.item.w;
+      setTimeout(()=>speak(round.item.w), 600);
+      endWord(true);
+    } else {
+      showFx(false);
+      btn.classList.add('used');
+      round.lives--; renderHearts();
+      if(round.lives <= 0){
+        renderTiles('bad');
+        $('msg').textContent = 'Era la letra ' + round.answer + ' — ' + round.item.w;
+        setTimeout(()=>speak('Era la letra ' + round.answer + '. ' + round.item.w), 700);
+        endWord(false);
+      } else {
+        $('msg').textContent = 'Casi... ¡intenta otra vez!';
+      }
+    }
+    return;
+  }
+
+  // modo 2: escribir la palabra letra por letra
+  const expected = norm(round.chars[round.pos]);
+  if(L === expected){
+    round.pos++;
+    if(round.pos >= round.chars.length){
+      showFx(true);
+      renderTiles('good'); bounceEmoji();
+      $('msg').textContent = '¡Muy bien! ' + round.item.w;
+      setTimeout(()=>speak(round.item.w), 600);
+      endWord(true);
+    } else {
+      beep('tick');
+      renderTiles(null);
+      $('msg').textContent = '¡Sigue así!';
+    }
+  } else {
+    showFx(false);
+    btn.classList.remove('wrong'); void btn.offsetWidth; btn.classList.add('wrong');
+    setTimeout(()=>btn.classList.remove('wrong'), 500);
+    round.lives--; renderHearts();
+    if(round.lives <= 0){
+      renderTiles('bad');
+      $('msg').textContent = 'Se escribe: ' + round.item.w.toUpperCase();
+      setTimeout(()=>speak('Se escribe ' + round.item.w), 700);
+      endWord(false);
+    } else {
+      $('msg').textContent = 'Esa no es... ¡intenta otra vez!';
+    }
+  }
+}
+
+// teclado físico
+document.addEventListener('keydown', e=>{
+  if($('admin').open || $('pinDlg').open || $('endDlg').open || !round || round.done) return;
+  const L = e.key.length===1 ? e.key.toUpperCase() : '';
+  if(!ALPHABET.includes(L)) return;
+  const b = [...document.querySelectorAll('.key')].find(x=>x.dataset.l===L);
+  if(b && !b.classList.contains('used')) pick(L,b);
+});
+
+$('mode1').onclick = ()=> startRun(1);
+$('mode2').onclick = ()=> startRun(2);
+$('back').onclick = goMenu;
+$('hear').onclick = ()=>{ if(round) speak(round.item.w); };
+
+/* ---------- panel de padres ---------- */
+function renderAdmin(){
+  $('count').textContent = active().length + ' de ' + words.length + ' seleccionadas';
+  const list = $('list'); list.innerHTML='';
+  words.forEach((w,i)=>{
+    const d = document.createElement('div'); d.className='item';
+    const lab = document.createElement('label');
+    lab.style.cssText = 'display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;font-size:1.1rem';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = w.a !== false;
+    cb.style.cssText = 'width:22px;height:22px';
+    cb.onchange = ()=>{ w.a = cb.checked; save(); renderAdmin(); };
+    const sp = document.createElement('span'); sp.textContent = (w.e||'') + ' ' + w.w;
+    if(w.a === false) sp.style.opacity = '.45';
+    lab.append(cb, sp);
+    const x = document.createElement('button'); x.className='btn red'; x.textContent='✕';
+    x.onclick = ()=>{ words.splice(i,1); save(); renderAdmin(); };
+    d.append(lab, x); list.appendChild(d);
+  });
+  $('pin').value = settings.pin;
+  $('voice').checked = settings.voice;
+  updateSndStatus();
+}
+
+$('openAdmin').onclick = ()=>{
+  $('pinInput').value=''; $('pinErr').textContent='';
+  $('pinDlg').showModal(); $('pinInput').focus();
+};
+$('pinCancel').onclick = ()=> $('pinDlg').close();
+function tryPin(){
+  if($('pinInput').value.trim() !== settings.pin){ $('pinErr').textContent='PIN incorrecto'; return; }
+  $('pinDlg').close(); renderAdmin(); $('admin').showModal();
+}
+$('pinOk').onclick = tryPin;
+$('pinInput').addEventListener('keydown',e=>{ if(e.key==='Enter') tryPin(); });
+
+function setAll(v){ words.forEach(w=>w.a=v); save(); renderAdmin(); }
+$('selAll').onclick = ()=> setAll(true);
+$('selNone').onclick = ()=> setAll(false);
+$('closeAdmin').onclick = ()=>{
+  settings.pin = $('pin').value.trim() || '1234';
+  settings.voice = $('voice').checked;
+  save();
+  $('admin').close(); renderMenu();
+};
+$('addBtn').onclick = ()=>{
+  const w = $('newWord').value.trim().toLowerCase();
+  const e = $('newEmoji').value.trim();
+  if(!/^[a-záéíóúüñ]+$/i.test(w)){ $('addErr').textContent='Solo letras, sin espacios ni números.'; return; }
+  if(words.some(x=>x.w===w)){ $('addErr').textContent='Esa palabra ya existe.'; return; }
+  words.push({w,e,a:true}); save();
+  $('newWord').value=''; $('newEmoji').value=''; $('addErr').textContent='';
+  renderAdmin();
+};
+$('newWord').addEventListener('keydown',e=>{ if(e.key==='Enter') $('addBtn').click(); });
+
+$('exportBtn').onclick = ()=>{
+  const blob = new Blob([JSON.stringify(words,null,2)],{type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'palabras.json'; a.click(); URL.revokeObjectURL(a.href);
+};
+$('importBtn').onclick = ()=> $('importFile').click();
+$('importFile').onchange = async e=>{
+  const f = e.target.files[0]; if(!f) return;
+  try{
+    const data = JSON.parse(await f.text());
+    const clean = data.filter(x=>x && typeof x.w==='string' && /^[a-záéíóúüñ]+$/i.test(x.w))
+                      .map(x=>({w:x.w.toLowerCase(), e:x.e||'', a:x.a!==false}));
+    if(!clean.length) throw 0;
+    words = clean; [1,2].forEach(m=>{ prog.m[m].lap = 0; }); save(); renderAdmin();
+  }catch{ $('addErr').textContent='Archivo no válido.'; }
+  e.target.value='';
+};
+let resetArmed = false;
+$('resetProg').onclick = ()=>{
+  if(!resetArmed){
+    resetArmed = true; $('resetProg').textContent = '¿Seguro? Toca otra vez';
+    setTimeout(()=>{ resetArmed=false; $('resetProg').textContent='Reiniciar progreso'; }, 3000);
+    return;
+  }
+  resetArmed = false; $('resetProg').textContent='Reiniciar progreso';
+  prog = {stars:0, m:{1:{lap:0}, 2:{lap:0}}};
+  save(); $('admin').close(); renderMenu();
+};
+
+/* ===== SONIDO: voz del navegador en español ===== */
+const hasTTS = 'speechSynthesis' in window;
+let esVoice = null, nVoices = 0, spkTok = 0, warnTimer = null;
+
+function loadVoice(){
+  if(!hasTTS) return;
+  const vs = speechSynthesis.getVoices() || [];
+  const es = vs.filter(v => (v.lang||'').toLowerCase().startsWith('es'));
+  nVoices = es.length;
+  esVoice = null;
+  for(const p of ['es-co','es-mx','es-us','es-419','es-ar','es-es']){
+    const v = es.find(v => v.lang.replace('_','-').toLowerCase() === p);
+    if(v){ esVoice = v; break; }
+  }
+  if(!esVoice) esVoice = es[0] || null;
+}
+if(hasTTS){
+  try{ speechSynthesis.addEventListener('voiceschanged', loadVoice); }catch{ speechSynthesis.onvoiceschanged = loadVoice; }
+  loadVoice();
+  // Chrome a veces tarda en entregar la lista de voces
+  let tries = 0;
+  const poll = setInterval(()=>{ loadVoice(); if(nVoices > 0 || ++tries > 12) clearInterval(poll); }, 250);
+  // iOS/Safari: "despertar" la voz con el primer toque
+  document.addEventListener('pointerdown', ()=>{
+    try{ const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); }catch{}
+  }, {once:true});
+}
+
+function warnNoVoice(){
+  const w = $('soundWarn');
+  w.textContent = '🔇 Este navegador no tiene voz en español. Pide ayuda a un adulto: ⚙ Padres → Probar sonido.';
+  w.hidden = false;
+  clearTimeout(warnTimer); warnTimer = setTimeout(()=>{ w.hidden = true; }, 7000);
+}
+
+// leer un texto (con una pausa corta tras cancel(): Chrome pierde el audio si se llama justo después)
+function speechText(text, rate){
+  if(!hasTTS){ warnNoVoice(); return; }
+  if(nVoices === 0) loadVoice();
+  if(nVoices === 0 && !esVoice) warnNoVoice();
+  const my = ++spkTok;
+  try{ speechSynthesis.cancel(); }catch{}
+  setTimeout(()=>{
+    if(my !== spkTok) return;
+    try{
+      const u = new SpeechSynthesisUtterance(text);
+      if(esVoice){ u.voice = esVoice; u.lang = esVoice.lang; } else u.lang = 'es-MX';
+      u.rate = rate || .8; u.volume = 1;
+      speechSynthesis.speak(u);
+    }catch{}
+  }, 90);
+}
+
+function updateSndStatus(){
+  const el = $('sndStatus'); if(!el) return;
+  loadVoice();
+  if(!hasTTS) el.textContent = 'Este navegador no tiene síntesis de voz.';
+  else if(nVoices === 0) el.textContent = 'No se encontraron voces en español en este navegador/computador.';
+  else el.textContent = 'Voces en español encontradas: ' + nVoices + (esVoice ? ' · se usa: ' + esVoice.name : '');
+}
+$('testSnd').onclick = ()=>{ updateSndStatus(); speechText('Hola, ¿me escuchas?', .85); };
+
+goMenu();
+</script>
+</body>
+</html>
